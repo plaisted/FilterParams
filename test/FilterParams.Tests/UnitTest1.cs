@@ -18,6 +18,16 @@ namespace FilterParams.Tests
             RunTest<Int16>(new List<short> { 1, 2, 3, 4 }, Operators.GreaterThanEqual, "2", new List<short> { 2, 3, 4 });
             RunTest<Int16>(new List<short> { 1, 2, 3, 4 }, Operators.LessThan, "3", new List<short> { 1, 2 });
             RunTest<Int16>(new List<short> { 1, 2, 3, 4 }, Operators.LessThanEqual, "3", new List<short> { 1, 2, 3 });
+
+            RunGroupTest<Int16>(new List<short> { 1, 2, 3, 4 }, GroupOperators.AND,
+                Operators.LessThan, "3",
+                Operators.GreaterThan, "1",
+                new List<short> { 2 });
+
+            RunGroupTest<Int16>(new List<short> { 1, 2, 3, 4 }, GroupOperators.OR,
+                Operators.Equal, "3",
+                Operators.Equal, "4",
+                new List<short> { 3, 4 });
         }
 
         [TestMethod]
@@ -38,6 +48,27 @@ namespace FilterParams.Tests
 
             var filterProvider = new Filter<TestContainer<T>>();
             filterProvider.AddFilter(new PropertyFilter { Operator = op, PropertyName = "Value", Value = value });
+            var result = filterProvider.Apply(list.AsQueryable());
+            var values = result.Select(x => x.Value).ToList();
+
+            Assert.IsTrue(Enumerable.SequenceEqual(values.OrderBy(x => x), expectedResults.OrderBy(x => x)));
+        }
+
+        public void RunGroupTest<T>(List<T> seedValues, GroupOperators op, Operators opFirst, string valueFirst,
+            Operators opSecond, string valueSecond, List<T> expectedResults)
+        {
+            List<TestContainer<T>> list = new List<TestContainer<T>>();
+            foreach (var val in seedValues)
+            {
+                list.Add(new TestContainer<T> { Value = val });
+            }
+
+            var filterProvider = new Filter<TestContainer<T>>();
+            var group = new PropertyFilterGroup();
+            group.Operator = op;
+            group.Children.Add(new PropertyFilter { Operator = opFirst, PropertyName = "Value", Value = valueFirst });
+            group.Children.Add(new PropertyFilter { Operator = opSecond, PropertyName = "Value", Value = valueSecond });
+            filterProvider.AddFilter(group);
             var result = filterProvider.Apply(list.AsQueryable());
             var values = result.Select(x => x.Value).ToList();
 
