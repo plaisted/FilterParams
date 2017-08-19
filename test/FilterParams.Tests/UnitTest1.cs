@@ -1,15 +1,14 @@
 using System;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.Collections.Generic;
 using System.Linq;
 using FilterParams;
+using Xunit;
 
 namespace FilterParams.Tests
 {
-    [TestClass]
     public class UnitTest1
     {
-        [TestMethod]
+        [Fact]
         public void TestMethod1()
         {
             RunTest<Int16>(new List<short> { 1, 2, 3, 4 }, Operators.Equal, "1", new List<short> { 1 });
@@ -30,7 +29,7 @@ namespace FilterParams.Tests
                 new List<short> { 3, 4 });
         }
 
-        [TestMethod]
+        [Fact]
         public void TestMethodString()
         {
             RunTest<string>(new List<string> { "a", "b", "c" }, Operators.Equal, "a", new List<string> { "a" });
@@ -46,12 +45,12 @@ namespace FilterParams.Tests
                 list.Add(new TestContainer<T> { Value = val });
             }
 
-            var filterProvider = new Filter<TestContainer<T>>();
+            var filterProvider = new Filter<ITestContainer<T>>();
             filterProvider.AddFilter(new PropertyFilter { Operator = op, PropertyName = "Value", Value = value });
             var result = filterProvider.Apply(list.AsQueryable());
             var values = result.Select(x => x.Value).ToList();
 
-            Assert.IsTrue(Enumerable.SequenceEqual(values.OrderBy(x => x), expectedResults.OrderBy(x => x)));
+            Assert.True(Enumerable.SequenceEqual(values.OrderBy(x => x), expectedResults.OrderBy(x => x)));
         }
 
         public void RunGroupTest<T>(List<T> seedValues, GroupOperators op, Operators opFirst, string valueFirst,
@@ -72,10 +71,10 @@ namespace FilterParams.Tests
             var result = filterProvider.Apply(list.AsQueryable());
             var values = result.Select(x => x.Value).ToList();
 
-            Assert.IsTrue(Enumerable.SequenceEqual(values.OrderBy(x => x), expectedResults.OrderBy(x => x)));
+            Assert.True(Enumerable.SequenceEqual(values.OrderBy(x => x), expectedResults.OrderBy(x => x)));
         }
     }
-    public class TestContainer<T>
+    public class TestContainer<T> : ITestContainer<T>
     {
         public T Value { get; set; }
         public SByte SByte { get; set; }
@@ -90,6 +89,11 @@ namespace FilterParams.Tests
         public DateTimeOffset DateTimeOffset { get; set; }
         public TimeSpan TimeSpan { get; set; }
         public string String { get; set; }
+    }
+
+    public interface ITestContainer<T>
+    {
+        T Value { get; set; }
     }
 
 }

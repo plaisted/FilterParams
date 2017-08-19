@@ -7,7 +7,12 @@ using System.Reflection;
 
 namespace FilterParams
 {
-    public class Filter<T>
+    public class Filter<T> : Filter<T, T>
+    {
+
+    }
+
+    public class Filter<IT, T>
     {
         private List<IExpressionable> filters { get; set; } = new List<IExpressionable>();
         public void AddFilter(PropertyFilter filter)
