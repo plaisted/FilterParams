@@ -6,10 +6,10 @@ using System.Text;
 
 namespace FilterParams
 {
-    public class PropertyFilterGroup : IExpressionable
+    public class PropertyFilterGroup : IFilterExpression
     {
         public GroupOperators Operator { get; set; }
-        public List<IExpressionable> Children { get; set; } = new List<IExpressionable>();
+        public List<IFilterExpression> Children { get; set; } = new List<IFilterExpression>();
 
         public Expression GetExpression<T>(ParameterExpression parameter)
         {

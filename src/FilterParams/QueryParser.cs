@@ -1,13 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
 namespace FilterParams
 {
-    public class SegmentParser
+    public class QueryParser
     {
-        //"(test=gt:5&or:test3=lt:1)&test2=lt:10" // (\\\)|[^)])*\)
-        public SegmentParser()
+        public QueryParser()
         {
             
         }
@@ -16,6 +16,64 @@ namespace FilterParams
             return GetSegment(query);
         }
 
+        public IFilterExpression ConvertSegment(Segment segment)
+        {
+            if (!segment.HasSegments)
+            {
+                return new PropertyFilter(segment.Value);
+            }
+            if (segment.Segments.Any(x=>x.WithNext == GroupOperators.OR))
+            {
+                var group = new PropertyFilterGroup();
+                group.Operator = GroupOperators.OR;
+
+                var andGroup = new PropertyFilterGroup();
+                GroupOperators lastOp = GroupOperators.None;
+                var segments = segment.Segments.ToList();
+                for (int i = segments.Count-1; i > -1; i--)
+                {
+                    if (i > 0 && segments[i - 1].WithNext == GroupOperators.AND)
+                    {
+                        andGroup.Children.Insert(0,ConvertSegment(segments[i]));
+                        segments.RemoveAt(i);
+                        lastOp = GroupOperators.AND;
+                    }
+                    else if (i > 0 && segments[i - 1].WithNext == GroupOperators.OR)
+                    {
+                        if (lastOp == GroupOperators.AND)
+                        {
+                            andGroup.Children.Insert(0,ConvertSegment(segments[i]));
+                            group.Children.Insert(0, andGroup);
+                            andGroup = new PropertyFilterGroup();
+                        }
+                        else
+                        {
+                            group.Children.Insert(0, ConvertSegment(segments[i]));
+                        }
+                        segments.RemoveAt(i);
+                        lastOp = GroupOperators.OR;
+                    }
+                    else
+                    {
+                        if (lastOp == GroupOperators.OR)
+                        {
+                            group.Children.Insert(0, ConvertSegment(segments[i]));
+                        } else
+                        {
+                            andGroup.Children.Insert(0, ConvertSegment(segments[i]));
+                            group.Children.Insert(0, andGroup);
+                        }
+                    }
+                }
+                return group;
+            } else
+            {
+                var group = new PropertyFilterGroup();
+                group.Operator = GroupOperators.AND;
+                group.Children.AddRange(segment.Segments.Select(x => ConvertSegment(x)));
+                return group;
+            }
+        }
         private SegmentParseResult GetSegment(string segment)
         {
             var mySegs = new List<Segment>();
@@ -34,7 +92,13 @@ namespace FilterParams
                         if (start > 0 && start - lastEndMatch > 1)
                         {
                             var text = segment.Substring(lastEndMatch + 1, start - lastEndMatch - 1);
-                            mySegs.AddRange(GetSegmentsFromString(text));
+                            var newSegs = GetSegmentsFromString(text);
+                            var last = newSegs.Last();
+                            if (last.WithNext == GroupOperators.None)
+                            {
+                                last.WithNext = GetNextOperator(segment, i);
+                            }
+                            mySegs.AddRange(newSegs);
                         }
                     }
                     continue;
@@ -53,13 +117,7 @@ namespace FilterParams
                         }
                         else
                         {
-                            if (segment.Length > i+4 && segment.Substring(i+1, 4) == "&or:")
-                            {
-                                seg.Segment.WithNext = GroupOperators.OR;
-                            } else
-                            {
-                                seg.Segment.WithNext = GroupOperators.AND;
-                            }
+                            seg.Segment.WithNext = GetNextOperator(segment, i);
                             mySegs.Add(seg.Segment);
                         }
                         start = -1;
@@ -80,7 +138,17 @@ namespace FilterParams
             //none
             if (start == -1 && end == -1 && mySegs.Count == 0)
             {
-                return new SegmentParseResult { HadError = false, Segment = new Segment { HasSegments = false, Value = segment } };
+                var results = GetSegmentsFromString(segment);
+                var result = new Segment();
+                if (results.Count > 1)
+                {
+                    result.HasSegments = true;
+                    result.Segments = results;
+                } else
+                {
+                    result = results.First();
+                }
+                return new SegmentParseResult { HadError = false, Segment = result };
             }
 
             //remainder
@@ -91,7 +159,21 @@ namespace FilterParams
 
             return new SegmentParseResult { Segment = new Segment { HasSegments = true, Segments = mySegs }, HadError = false};
         }
-
+        private GroupOperators GetNextOperator(string text, int location)
+        {
+            if (text.Length > location + 4 && text.Substring(location + 1, 4) == ParserTools.Or)
+            {
+                return GroupOperators.OR;
+            }
+            else if (text.Length > location + 1)
+            {
+                return GroupOperators.AND;
+            }
+            else
+            {
+                return GroupOperators.None;
+            }
+        }
         private List<Segment> GetSegmentsFromString(string text)
         {
             var segs = new List<Segment>();
@@ -116,7 +198,7 @@ namespace FilterParams
                 }
                 else
                 {
-                    seg.WithNext = GroupOperators.AND;
+                    seg.WithNext = GroupOperators.None;
                 }
                 segs.Add(seg);
             }
@@ -152,93 +234,4 @@ namespace FilterParams
         public const string NoEndingParenthesis = "Starting paranthesis without ending.";
         public const string NoStartingParenthesis = "Ending paranthesis without starting.";
     }
-
-    public static class ParserTools
-    {
-        public static string StripSurroundingOps(string value)
-        {
-            if (value.StartsWith(Or))
-            {
-                value = value.Substring(Or.Length);
-            }
-            if (value.StartsWith(And))
-            {
-                value = value.Substring(And.Length);
-            }
-            if (value.EndsWith(Or))
-            {
-                value = value.Substring(0, value.Length - Or.Length);
-            }
-            if (value.EndsWith(And))
-            {
-                value = value.Substring(0, value.Length - And.Length);
-            }
-            return value;
-        }
-        public static bool NotEscaped(string segment, int character)
-        {
-            if (character == 0)
-            {
-                return true;
-            }
-            int count = 0;
-            for (int i = character - 1; i > -1; i--)
-            {
-                if (segment[i] == '\\')
-                {
-                    count += 1;
-                }
-                else
-                {
-                    break;
-                }
-            }
-            return count % 2 == 0;
-        }
-        public static bool ContainsUnescaped(string segment, string value)
-        {
-            var loc = segment.IndexOf(value);
-            return loc != -1 && NotEscaped(segment, loc);
-        }
-        public static List<string> SplitOnUnescaped(string data, string[] values)
-        {
-            List<string> vals = new List<string>(values);
-            vals.Sort((a, b) => -1 * a.CompareTo(b));
-            List<string> splits = new List<string>();
-            while (!string.IsNullOrEmpty(data))
-            {
-                int first = -1;
-                int foundLength = -1;
-                foreach (var val in vals)
-                {
-                    var loc = data.IndexOf(val);
-                    if (loc == -1)
-                    {
-                        continue;
-                    }
-                    if (ParserTools.NotEscaped(data, loc) && (loc < first || first == -1))
-                    {
-                        first = loc;
-                        foundLength = val.Length;
-                    }
-                }
-                if (first == -1)
-                {
-                    splits.Add(data);
-                    break;
-                }
-                if (first != 0)
-                {
-                    splits.Add(data.Substring(0, first));
-                    splits.Add(data.Substring(first, foundLength));
-                }
-                data = data.Substring(first + foundLength);
-
-            }
-            return splits;
-        }
-        public const string Or = "&or:";
-        public const string And = "&";
-    }
-
 }

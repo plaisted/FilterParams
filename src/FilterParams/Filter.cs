@@ -14,7 +14,7 @@ namespace FilterParams
 
     public class Filter<IT, T>
     {
-        private List<IExpressionable> filters { get; set; } = new List<IExpressionable>();
+        private List<IFilterExpression> filters { get; set; } = new List<IFilterExpression>();
         public void AddFilter(PropertyFilter filter)
         {
             filters.Add(filter);
@@ -22,6 +22,10 @@ namespace FilterParams
         public void AddFilter(PropertyFilterGroup filterGroup)
         {
             filters.Add(filterGroup);
+        }
+        public void AddFilter(IFilterExpression filter)
+        {
+            filters.Add(filter);
         }
         public IQueryable<T> Apply(IQueryable<T> input)
         {

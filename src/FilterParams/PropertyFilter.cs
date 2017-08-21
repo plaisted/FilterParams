@@ -8,7 +8,7 @@ using System.Text;
 
 namespace FilterParams
 {
-    public class PropertyFilter : IExpressionable
+    public class PropertyFilter : IFilterExpression
     {
         public PropertyFilter()
         {
@@ -16,7 +16,7 @@ namespace FilterParams
         }
         public PropertyFilter(string contents)
         {
-
+            ParseStatement(contents);
         }
         public Operators Operator { get; set; }
         public string PropertyName { get; set; }
@@ -43,6 +43,27 @@ namespace FilterParams
             var expVal = Expression.Constant(value);
 
             return GetExpression<T>(property, expVal, prop);
+        }
+        private void ParseStatement(string statement)
+        {
+            var equal = statement.IndexOf('=');
+            if (equal == -1)
+            {
+                throw new Exception("Statement did not contain an equals.");
+            }
+            PropertyName = statement.Substring(0, equal);
+            statement = statement.Substring(equal + 1);
+            var operatorSep = statement.IndexOf(':');
+            if (operatorSep > -1)
+            {
+                Operator = ParseOperators.FromString(statement.Substring(0, operatorSep));
+                statement = statement.Substring(operatorSep + 1);
+            }
+            else
+            {
+                Operator = Operators.Equal;
+            }
+            Value = statement;
         }
         private Expression GetExpression<T>(MemberExpression property, ConstantExpression expVal,
             PropertyInfo prop)

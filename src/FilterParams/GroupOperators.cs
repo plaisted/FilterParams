@@ -6,6 +6,7 @@ namespace FilterParams
 {
     public enum GroupOperators
     {
+        None,
         AND,
         OR
     }
