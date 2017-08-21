@@ -10,6 +10,14 @@ namespace FilterParams
 {
     public class PropertyFilter : IExpressionable
     {
+        public PropertyFilter()
+        {
+
+        }
+        public PropertyFilter(string contents)
+        {
+
+        }
         public Operators Operator { get; set; }
         public string PropertyName { get; set; }
         private PropertyInfo PropertyInfo { get; set; }
