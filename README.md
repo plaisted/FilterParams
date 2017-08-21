@@ -18,7 +18,7 @@ The goal is to provide a simple and easy to implement alternative to standards s
         public async Task<IActionResult> Get(Filter<TestType> filter)
         {
             //_db.TestTypes is EF IQueryable DbSet<TestType>
-            return filter.Apply(_db.TestTypes).ToList();
+            return Ok(filter.Apply(_db.TestTypes).ToList());
         }
     }
     
